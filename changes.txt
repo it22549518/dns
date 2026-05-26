@@ -1,0 +1,10 @@
+stream = io.StringIO(f.stream.read().decode("utf-8"))     - should need to change
+
+raw_bytes = f.stream.read()
+try:
+    text = raw_bytes.decode("utf-8-sig")
+except UnicodeDecodeError:
+    text = raw_bytes.decode("latin-1")
+stream = io.StringIO(text)
+
+  to this
