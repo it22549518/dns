@@ -8,3 +8,7 @@ except UnicodeDecodeError:
 stream = io.StringIO(text)
 
   to this
+
+
+# Instead of Invoke-Command, use:
+Get-DnsServerResourceRecord -ComputerName "192.168.13.80" -ZoneName "..." -Name "..." -RRType A
