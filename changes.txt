@@ -12,3 +12,5 @@ stream = io.StringIO(text)
 
 # Instead of Invoke-Command, use:
 Get-DnsServerResourceRecord -ComputerName "192.168.13.80" -ZoneName "..." -Name "..." -RRType A
+
+Set-Item WSMan:\localhost\Client\TrustedHosts -Value "192.168.13.80" -Force
