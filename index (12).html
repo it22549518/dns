@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DNS DR Control Panel</title>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg0:#0a0c10;
+  --bg1:#10141c;
+  --bg2:#161b27;
+  --bg3:#1e2535;
+  --border:#2a3347;
+  --border2:#3a4a63;
+  --text:#c8d4e8;
+  --text2:#7a90b0;
+  --text3:#4a5870;
+  --ho:#00c8ff;
+  --ho-dim:#003a4a;
+  --dr:#ff6b35;
+  --dr-dim:#4a1a08;
+  --green:#00e676;
+  --green-dim:#003820;
+  --red:#ff3d3d;
+  --red-dim:#3a0808;
+  --yellow:#ffd600;
+  --yellow-dim:#3a3200;
+  --mono: 'Consolas','Courier New',monospace;
+  --display: 'Arial Narrow','Arial',sans-serif;
+}
+
+body{background:var(--bg0);color:var(--text);font-family:var(--mono);font-size:13px;min-height:100vh;overflow-x:hidden}
+
+/* scanline overlay */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:9999}
+
+/* ── HEADER ── */
+header{background:var(--bg1);border-bottom:2px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:24px;height:56px;position:sticky;top:0;z-index:100}
+.logo{font-family:var(--display);font-size:22px;font-weight:800;letter-spacing:2px;color:#fff;display:flex;align-items:center;gap:10px}
+.logo-dot{width:10px;height:10px;border-radius:50%;background:var(--ho);box-shadow:0 0 8px var(--ho);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.header-tag{font-size:10px;color:var(--text3);letter-spacing:3px;text-transform:uppercase;margin-left:auto}
+.record-count{font-family:var(--display);font-size:28px;font-weight:700;color:var(--ho);line-height:1}
+.record-count small{font-size:12px;color:var(--text3);font-family:var(--mono);font-weight:400;display:block;margin-top:2px}
+
+/* ── LAYOUT ── */
+.shell{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 56px)}
+
+/* ── LEFT PANEL ── */
+.left{background:var(--bg1);border-right:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.panel-head{padding:16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.panel-title{font-family:var(--display);font-size:16px;font-weight:700;letter-spacing:1px;color:#fff;text-transform:uppercase}
+.badge{background:var(--bg3);border:1px solid var(--border2);border-radius:2px;padding:2px 8px;font-size:10px;color:var(--text2);letter-spacing:1px}
+
+/* DNS server input */
+.dns-server-block{padding:14px 16px;border-bottom:1px solid var(--border);background:var(--bg0)}
+.field-label{font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;margin-bottom:6px}
+.field-input{width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 10px;outline:none;transition:border .2s}
+.field-input:focus{border-color:var(--ho)}
+.field-input::placeholder{color:var(--text3)}
+
+/* fire buttons */
+.fire-block{padding:16px;border-bottom:2px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fire-btn{padding:14px 8px;font-family:var(--display);font-size:18px;font-weight:800;letter-spacing:2px;text-transform:uppercase;border:2px solid;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:4px;background:transparent;position:relative;overflow:hidden}
+.fire-btn::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .2s}
+.fire-btn:hover::before{opacity:1}
+.fire-btn small{font-size:9px;font-family:var(--mono);font-weight:400;letter-spacing:1px;opacity:.7}
+
+.btn-dr{color:var(--dr);border-color:var(--dr)}
+.btn-dr::before{background:var(--dr-dim)}
+.btn-dr:hover{box-shadow:0 0 20px rgba(255,107,53,.3);color:#fff}
+
+.btn-ho{color:var(--ho);border-color:var(--ho)}
+.btn-ho::before{background:var(--ho-dim)}
+.btn-ho:hover{box-shadow:0 0 20px rgba(0,200,255,.3);color:#fff}
+
+.fire-btn:disabled{opacity:.3;cursor:not-allowed}
+
+/* search */
+.search-block{padding:12px 16px;border-bottom:1px solid var(--border)}
+.search-wrap{position:relative}
+.search-input{width:100%;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 10px 8px 30px;outline:none}
+.search-input:focus{border-color:var(--border2)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px}
+
+/* record list */
+.record-list{flex:1;overflow-y:auto;padding:8px}
+.record-list::-webkit-scrollbar{width:4px}
+.record-list::-webkit-scrollbar-track{background:var(--bg0)}
+.record-list::-webkit-scrollbar-thumb{background:var(--border2)}
+
+.rec-item{background:var(--bg2);border:1px solid var(--border);margin-bottom:4px;padding:10px 12px;cursor:pointer;transition:all .1s;display:flex;align-items:center;gap:8px;position:relative}
+.rec-item:hover{border-color:var(--border2);background:var(--bg3)}
+.rec-item.selected{border-color:var(--ho);background:rgba(0,200,255,.05)}
+.rec-item.sel-dr{border-color:var(--dr);background:rgba(255,107,53,.05)}
+.rec-app{font-family:var(--display);font-size:14px;font-weight:700;color:#fff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rec-record{font-size:10px;color:var(--text2)}
+.rec-ips{margin-left:auto;text-align:right;font-size:10px;line-height:1.6}
+.ip-ho{color:var(--ho)}
+.ip-dr{color:var(--dr)}
+.rec-del{background:none;border:none;color:var(--text3);cursor:pointer;padding:0 4px;font-size:14px;opacity:0;transition:opacity .1s}
+.rec-item:hover .rec-del{opacity:1}
+.rec-del:hover{color:var(--red)}
+.rec-status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot-ho{background:var(--ho)}
+.dot-dr{background:var(--dr)}
+.dot-none{background:var(--text3)}
+
+/* add / import */
+.add-block{padding:12px 16px;border-top:1px solid var(--border);background:var(--bg0)}
+.btn-row{display:flex;gap:8px}
+.btn-sm{flex:1;padding:8px;font-family:var(--mono);font-size:11px;border:1px solid var(--border2);background:var(--bg2);color:var(--text);cursor:pointer;letter-spacing:1px;transition:all .15s;text-align:center}
+.btn-sm:hover{background:var(--bg3);border-color:var(--ho);color:var(--ho)}
+
+/* ── RIGHT PANEL ── */
+.right{display:flex;flex-direction:column;overflow:hidden}
+
+/* tabs */
+.tabs{display:flex;border-bottom:2px solid var(--border);background:var(--bg1)}
+.tab{padding:14px 20px;font-family:var(--display);font-size:14px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab.active{color:#fff;border-bottom-color:var(--ho)}
+.tab:hover:not(.active){color:var(--text)}
+
+.tab-content{flex:1;overflow:hidden;display:none}
+.tab-content.active{display:flex;flex-direction:column}
+#tab-live.active{flex-direction:row}
+
+/* job panel */
+.job-panel{padding:20px;border-bottom:2px solid var(--border);background:var(--bg1)}
+.job-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.meta-card{background:var(--bg0);border:1px solid var(--border);padding:12px;text-align:center}
+.meta-val{font-family:var(--display);font-size:32px;font-weight:800;line-height:1}
+.meta-lbl{font-size:10px;color:var(--text3);letter-spacing:2px;margin-top:4px}
+.val-total{color:#fff}
+.val-done{color:var(--yellow)}
+.val-ok{color:var(--green)}
+.val-fail{color:var(--red)}
+
+.progress-bar{height:8px;background:var(--bg0);border:1px solid var(--border);position:relative;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--ho),var(--dr));transition:width .3s;width:0%}
+.progress-fill.done-ok{background:var(--green)}
+.progress-fill.done-fail{background:linear-gradient(90deg,var(--green),var(--red))}
+.progress-label{font-size:10px;color:var(--text3);margin-top:6px;display:flex;justify-content:space-between}
+
+.direction-badge{display:inline-flex;align-items:center;gap:8px;padding:4px 14px;font-family:var(--display);font-size:20px;font-weight:800;letter-spacing:2px;border:2px solid;margin-bottom:12px}
+.dir-dr{color:var(--dr);border-color:var(--dr);background:var(--dr-dim)}
+.dir-ho{color:var(--ho);border-color:var(--ho);background:var(--ho-dim)}
+.dir-idle{color:var(--text3);border-color:var(--border);background:var(--bg0)}
+
+.abort-btn{padding:8px 20px;background:var(--red-dim);border:1px solid var(--red);color:var(--red);font-family:var(--mono);font-size:11px;cursor:pointer;letter-spacing:1px;transition:all .15s}
+.abort-btn:hover{background:var(--red);color:#fff}
+
+/* results table */
+.results-table-wrap{flex:1;overflow-y:auto;padding:16px}
+.results-table-wrap::-webkit-scrollbar{width:4px}
+.results-table-wrap::-webkit-scrollbar-track{background:var(--bg0)}
+.results-table-wrap::-webkit-scrollbar-thumb{background:var(--border2)}
+
+table{width:100%;border-collapse:collapse}
+th{font-size:10px;letter-spacing:2px;color:var(--text3);text-transform:uppercase;padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;position:sticky;top:0;background:var(--bg0)}
+td{padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle}
+tr:hover td{background:var(--bg2)}
+.status-ok{color:var(--green);font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:1px}
+.status-fail{color:var(--red);font-family:var(--display);font-size:13px;font-weight:700;letter-spacing:1px}
+.status-pending{color:var(--yellow)}
+.arrow-cell{color:var(--text3)}
+.ip-cell{font-size:11px}
+
+/* history tab */
+.history-list{flex:1;overflow-y:auto;padding:16px}
+.history-list::-webkit-scrollbar{width:4px}
+.history-list::-webkit-scrollbar-track{background:var(--bg0)}
+.history-list::-webkit-scrollbar-thumb{background:var(--border2)}
+.hist-item{background:var(--bg2);border:1px solid var(--border);margin-bottom:8px;overflow:hidden}
+.hist-head{padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:background .1s}
+.hist-head:hover{background:var(--bg3)}
+.hist-dir{font-family:var(--display);font-size:16px;font-weight:800;letter-spacing:2px;padding:2px 10px;border:1px solid}
+.hist-dir.dr{color:var(--dr);border-color:var(--dr);background:var(--dr-dim)}
+.hist-dir.ho{color:var(--ho);border-color:var(--ho);background:var(--ho-dim)}
+.hist-time{color:var(--text2);font-size:11px}
+.hist-stats{margin-left:auto;font-size:11px}
+.hist-ok{color:var(--green)}
+.hist-fail{color:var(--red)}
+.hist-server{color:var(--text3);font-size:10px;letter-spacing:1px}
+.hist-body{display:none;border-top:1px solid var(--border);max-height:300px;overflow-y:auto}
+.hist-body.open{display:block}
+
+/* add modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:500}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg1);border:2px solid var(--border2);width:480px;max-width:95vw}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);font-family:var(--display);font-size:18px;font-weight:800;letter-spacing:2px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.modal-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;transition:color .1s}
+.modal-close:hover{color:var(--red)}
+.modal-body{padding:20px;display:grid;gap:14px}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+.btn-primary{padding:10px 24px;background:var(--ho-dim);border:1px solid var(--ho);color:var(--ho);font-family:var(--mono);font-size:12px;cursor:pointer;letter-spacing:1px;transition:all .15s}
+.btn-primary:hover{background:var(--ho);color:#000}
+.btn-cancel{padding:10px 16px;background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:var(--mono);font-size:12px;cursor:pointer;letter-spacing:1px}
+.btn-cancel:hover{border-color:var(--text)}
+
+/* confirm modal */
+.confirm-modal{background:var(--bg1);border:2px solid;width:400px;max-width:95vw}
+.confirm-modal.dr-confirm{border-color:var(--dr)}
+.confirm-modal.ho-confirm{border-color:var(--ho)}
+.confirm-head{padding:16px 20px;border-bottom:1px solid var(--border);font-family:var(--display);font-size:20px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+.confirm-head.dr{color:var(--dr)}
+.confirm-head.ho{color:var(--ho)}
+.confirm-body{padding:20px;line-height:1.8;color:var(--text2)}
+.confirm-count{font-family:var(--display);font-size:40px;font-weight:800;color:#fff;line-height:1;margin:12px 0}
+.confirm-body small{font-size:10px;color:var(--text3);letter-spacing:1px;display:block;margin-top:8px}
+.confirm-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px}
+.btn-confirm-dr{flex:1;padding:12px;background:var(--dr-dim);border:2px solid var(--dr);color:var(--dr);font-family:var(--display);font-size:16px;font-weight:800;letter-spacing:2px;cursor:pointer;transition:all .15s}
+.btn-confirm-dr:hover{background:var(--dr);color:#fff;box-shadow:0 0 20px rgba(255,107,53,.4)}
+.btn-confirm-ho{flex:1;padding:12px;background:var(--ho-dim);border:2px solid var(--ho);color:var(--ho);font-family:var(--display);font-size:16px;font-weight:800;letter-spacing:2px;cursor:pointer;transition:all .15s}
+.btn-confirm-ho:hover{background:var(--ho);color:#000;box-shadow:0 0 20px rgba(0,200,255,.4)}
+
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg3);border:1px solid var(--border2);padding:12px 20px;font-size:12px;z-index:9000;animation:slideUp .3s;max-width:340px}
+.toast.ok{border-color:var(--green);color:var(--green)}
+.toast.err{border-color:var(--red);color:var(--red)}
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+.empty-state{padding:40px;text-align:center;color:var(--text3)}
+.empty-state big{font-family:var(--display);font-size:32px;font-weight:800;display:block;margin-bottom:8px}
+
+.sel-count-bar{background:var(--bg0);border-bottom:1px solid var(--border);padding:8px 16px;font-size:11px;color:var(--text3);display:flex;align-items:center;gap:12px}
+.sel-clear{color:var(--text3);cursor:pointer;text-decoration:underline;margin-left:auto}
+.sel-clear:hover{color:var(--text)}
+
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-dot"></span>
+    DNS DR CONTROL
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+    <div class="record-count" id="hdr-count">0 <small>records loaded</small></div>
+  </div>
+  <div class="header-tag">BANK INTERNAL · DR AUTOMATION</div>
+</header>
+
+<div class="shell">
+
+  <!-- ── LEFT ── -->
+  <aside class="left">
+
+    <div class="panel-head">
+      <span class="panel-title">Records</span>
+      <span class="badge" id="sel-badge">0 selected</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--text3)" id="filter-count"></span>
+    </div>
+
+    <div class="dns-server-block">
+      <div class="field-label">DNS Server</div>
+      <div style="background:var(--bg3);border:1px solid var(--border2);padding:8px 10px;font-size:12px;color:var(--ho);display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span id="conn-dot" style="width:7px;height:7px;border-radius:50%;background:var(--text3);display:inline-block;flex-shrink:0;transition:background .3s"></span>
+        192.168.13.80 &nbsp;<span style="color:var(--text3);font-size:10px">user1</span>
+      </div>
+      <!-- connection status rows -->
+      <div id="conn-status-rows" style="display:none;margin-bottom:8px;font-size:10px;line-height:2">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">Ping</span>       <span id="cs-ping">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">WinRM port 5985</span><span id="cs-port">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">WinRM auth</span> <span id="cs-auth">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--text3)">DNS module</span> <span id="cs-dns">—</span></div>
+        <div id="cs-zones-row" style="display:none;margin-top:4px;padding:6px 8px;background:var(--bg0);border:1px solid var(--border);border-radius:2px;color:var(--text2);word-break:break-word"></div>
+        <div id="cs-error-row" style="display:none;margin-top:4px;padding:6px 8px;background:var(--red-dim);border:1px solid var(--red);color:var(--red);word-break:break-word;font-size:10px"></div>
+      </div>
+      <button class="btn-sm" id="test-conn-btn" onclick="testConnection()" style="width:100%;margin-bottom:0">⟳ Test Connection</button>
+    </div>
+
+    <div class="fire-block">
+      <button class="fire-btn btn-dr" id="fire-dr" onclick="confirmFire('DR')" disabled>
+        ⇒ DR
+        <small>Switch to disaster recovery</small>
+      </button>
+      <button class="fire-btn btn-ho" id="fire-ho" onclick="confirmFire('HO')" disabled>
+        ⇐ HO
+        <small>Roll back to head office</small>
+      </button>
+    </div>
+
+    <!-- Speed control -->
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg1)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:10px;color:var(--text3);letter-spacing:1px;text-transform:uppercase">Parallel Workers</span>
+        <span id="worker-val" style="font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ho)">10</span>
+      </div>
+      <input type="range" id="worker-slider" min="1" max="30" value="10"
+        style="width:100%;accent-color:var(--ho);cursor:pointer"
+        oninput="updateWorkers(this.value)"/>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px">
+        <span>1 (safe)</span>
+        <span>10 (recommended)</span>
+        <span>30 (fast)</span>
+      </div>
+      <div style="font-size:9px;color:var(--text3);margin-top:4px;text-align:center" id="speed-est">
+        ~600 records in ~60s at 10 workers
+      </div>
+    </div>
+
+    <div class="search-block">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" id="search" placeholder="Search app, record, IP..." oninput="filterRecords()"/>
+      </div>
+    </div>
+
+    <div class="record-list" id="record-list"></div>
+
+    <div class="add-block">
+      <div class="btn-row">
+        <button class="btn-sm" onclick="openAddModal()">＋ Add record</button>
+        <button class="btn-sm" onclick="document.getElementById('csv-input').click()">↑ Import CSV/XLSX</button>
+        <button class="btn-sm" onclick="exportCSV()">↓ Export</button>
+      </div>
+      <input type="file" id="csv-input" accept=".csv,.xlsx,.xls" onchange="importCSV(this)"/>
+    </div>
+
+  </aside>
+
+  <!-- ── RIGHT ── -->
+  <main class="right">
+
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('job')">Live Job</div>
+      <div class="tab" onclick="switchTab('history')">History</div>
+      <div class="tab" onclick="switchTab('live')">⟳ Live DNS</div>
+    </div>
+
+    <!-- JOB TAB -->
+    <div class="tab-content active" id="tab-job">
+
+      <div class="job-panel">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div class="direction-badge dir-idle" id="dir-badge">IDLE</div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:var(--text3);letter-spacing:2px;margin-bottom:4px" id="job-server-lbl"></div>
+            <div style="font-size:11px;color:var(--text2)" id="job-time-lbl"></div>
+          </div>
+          <button class="abort-btn" id="abort-btn" onclick="abortJob()" style="display:none">■ ABORT</button>
+        </div>
+
+        <div class="job-meta">
+          <div class="meta-card"><div class="meta-val val-total" id="m-total">—</div><div class="meta-lbl">Total</div></div>
+          <div class="meta-card"><div class="meta-val val-done" id="m-done">—</div><div class="meta-lbl">Done</div></div>
+          <div class="meta-card"><div class="meta-val val-ok" id="m-ok">—</div><div class="meta-lbl">OK</div></div>
+          <div class="meta-card"><div class="meta-val val-fail" id="m-fail">—</div><div class="meta-lbl">Failed</div></div>
+        </div>
+
+        <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+        <div class="progress-label"><span id="prog-pct">0%</span><span id="prog-eta"></span></div>
+      </div>
+
+      <div class="results-table-wrap" id="results-wrap">
+        <div class="empty-state"><big>No job running</big>Fire a DR or HO switch from the left panel</div>
+        <table id="results-table" style="display:none">
+          <thead>
+            <tr>
+              <th>App</th>
+              <th>Record</th>
+              <th>From IP</th>
+              <th></th>
+              <th>To IP</th>
+              <th>Status</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div class="tab-content" id="tab-history">
+      <div class="history-list" id="history-list">
+        <div class="empty-state"><big>No history</big>Sessions appear here after a job completes</div>
+      </div>
+    </div>
+
+    <!-- LIVE DNS TAB -->
+    <div class="tab-content" id="tab-live">
+
+      <!-- Zone list (left) -->
+      <div style="width:220px;min-width:220px;background:var(--bg1);border-right:2px solid var(--border);display:flex;flex-direction:column;overflow:hidden">
+        <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+          <span style="font-family:var(--display);font-size:14px;font-weight:800;letter-spacing:1px;color:#fff;text-transform:uppercase">Zones</span>
+          <button class="btn-sm" id="zones-refresh-btn" onclick="loadZones()" style="margin-left:auto;padding:4px 10px;font-size:10px;flex:none">⟳</button>
+        </div>
+        <div style="flex:1;overflow-y:auto" id="zone-list">
+          <div style="padding:20px;text-align:center;color:var(--text3);font-size:11px">Click ⟳ to load zones</div>
+        </div>
+      </div>
+
+      <!-- Records panel (right) -->
+      <div style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);background:var(--bg1);display:flex;align-items:center;gap:12px">
+          <div>
+            <div style="font-family:var(--display);font-size:15px;font-weight:800;color:#fff" id="zone-title">Select a zone</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px" id="zone-subtitle">Click a zone on the left to view its A records</div>
+          </div>
+          <input id="dns-rec-search" style="margin-left:auto;background:var(--bg2);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 10px;outline:none;width:200px" placeholder="Filter hostname / IP..." oninput="filterDnsRecords()"/>
+          <div id="rec-count" style="font-size:11px;color:var(--text3);white-space:nowrap"></div>
+        </div>
+        <div style="flex:1;overflow-y:auto" id="dns-records-wrap">
+          <div class="empty-state"><big>📋</big>Select a zone from the left panel</div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-head">
+      Add DNS Record
+      <button class="modal-close" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <div class="field-label">App Name</div>
+        <input class="field-input" id="f-app" placeholder="CoreBanking"/>
+      </div>
+      <div>
+        <div class="field-label">DNS Record Name</div>
+        <input class="field-input" id="f-rec" placeholder="corebank"/>
+      </div>
+      <div>
+        <div class="field-label">DNS Zone</div>
+        <input class="field-input" id="f-zone" placeholder="bank.local"/>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div class="field-label">HO IP (head office)</div>
+          <input class="field-input" id="f-hoip" placeholder="10.1.1.10"/>
+        </div>
+        <div>
+          <div class="field-label">DR IP (disaster recovery)</div>
+          <input class="field-input" id="f-drip" placeholder="10.99.1.10"/>
+        </div>
+      </div>
+      <div>
+        <div class="field-label">Override DNS Server (optional)</div>
+        <input class="field-input" id="f-dns" placeholder="leave blank to use global"/>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeAddModal()">Cancel</button>
+      <button class="btn-primary" onclick="addRecord()">Add Record</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="confirm-modal" id="confirm-box">
+    <div class="confirm-head" id="confirm-head"></div>
+    <div class="confirm-body">
+      <div id="confirm-text"></div>
+      <div class="confirm-count" id="confirm-count"></div>
+      <small id="confirm-sub"></small>
+    </div>
+    <div class="confirm-foot">
+      <button class="btn-cancel" onclick="closeConfirm()" style="flex:1">Cancel</button>
+      <button id="confirm-go" style="flex:2"></button>
+    </div>
+  </div>
+</div>
+
+<!-- VERIFY MODAL -->
+<div class="modal-overlay" id="verify-modal" style="align-items:flex-start;padding-top:40px">
+  <div style="background:var(--bg1);border:2px solid var(--border2);width:900px;max-width:97vw;max-height:85vh;display:flex;flex-direction:column">
+    <div style="padding:14px 18px;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:12px">
+      <div id="verify-title" style="font-family:var(--display);font-size:16px;font-weight:800;letter-spacing:1px;text-transform:uppercase;flex:1"></div>
+      <button onclick="closeConfirm()" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:4px 8px">✕</button>
+    </div>
+    <div style="padding:10px 18px;border-bottom:1px solid var(--border);background:var(--bg0)" id="verify-summary"></div>
+    <div style="flex:1;overflow-y:auto" id="verify-body"></div>
+    <div style="padding:12px 18px;border-top:2px solid var(--border);display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="closeConfirm()" style="background:none;border:1px solid var(--border2);color:var(--text3);padding:10px 24px;cursor:pointer;font-family:var(--mono)">Cancel</button>
+      <button id="verify-go" style="display:none;border:2px solid;padding:12px 28px;cursor:pointer;font-family:var(--display);font-size:14px;font-weight:800;letter-spacing:1px;background:transparent"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── state ──────────────────────────────────────────────────────────────────
+let allRecords = [];
+let filteredRecords = [];
+let selectedIds = new Set();
+let pollTimer = null;
+let pendingDirection = null;
+let jobRunning = false;
+let jobStartTime = null;
+
+// ── init ───────────────────────────────────────────────────────────────────
+async function init(){
+  await loadRecords();
+  renderList();
+  checkJobStatus();
+  loadHistory();
+}
+
+// ── records ────────────────────────────────────────────────────────────────
+async function loadRecords(){
+  const r = await fetch('/api/records');
+  allRecords = await r.json();
+  filteredRecords = allRecords;
+  document.getElementById('hdr-count').innerHTML = `${allRecords.length} <small>records loaded</small>`;
+  renderList();
+  updateFireBtns();
+}
+
+function filterRecords(){
+  const q = document.getElementById('search').value.toLowerCase();
+  filteredRecords = q
+    ? allRecords.filter(r => r.app_name.toLowerCase().includes(q) || r.record_name.toLowerCase().includes(q) || (r.ho_ip||'').includes(q) || (r.dr_ip||'').includes(q) || (r.zone||'').includes(q))
+    : allRecords;
+  document.getElementById('filter-count').textContent = q ? `${filteredRecords.length} shown` : '';
+  renderList();
+}
+
+function renderList(){
+  const el = document.getElementById('record-list');
+  if(!filteredRecords.length){
+    el.innerHTML = `<div class="empty-state"><big>0</big>No records match</div>`;
+    updateSelBadge();
+    return;
+  }
+  el.innerHTML = filteredRecords.map(r => {
+    const sel = selectedIds.has(String(r.id));
+    return `<div class="rec-item ${sel?'selected':''}" onclick="toggleSelect('${r.id}',event)">
+      <div class="rec-status-dot dot-none" id="dot-${r.id}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="rec-app">${r.app_name}</div>
+        <div class="rec-record">${r.record_name}.${r.zone}</div>
+      </div>
+      <div class="rec-ips">
+        <div class="ip-ho">${r.ho_ip}</div>
+        <div class="ip-dr">${r.dr_ip}</div>
+      </div>
+      <button class="rec-del" onclick="deleteRecord('${r.id}',event)" title="Delete">✕</button>
+    </div>`;
+  }).join('');
+  updateSelBadge();
+}
+
+function toggleSelect(id, e){
+  if(e.target.classList.contains('rec-del')) return;
+  const sid = String(id);
+  if(selectedIds.has(sid)) selectedIds.delete(sid);
+  else selectedIds.add(sid);
+  renderList();
+  updateFireBtns();
+}
+
+function updateSelBadge(){
+  const n = selectedIds.size;
+  document.getElementById('sel-badge').textContent = n ? `${n} selected` : '0 selected';
+}
+
+function updateFireBtns(){
+  const enabled = allRecords.length > 0 && !jobRunning;
+  document.getElementById('fire-dr').disabled = !enabled;
+  document.getElementById('fire-ho').disabled = !enabled;
+}
+
+async function deleteRecord(id, e){
+  e.stopPropagation();
+  await fetch(`/api/records/${id}`, {method:'DELETE'});
+  selectedIds.delete(String(id));
+  await loadRecords();
+}
+
+// ── add modal ──────────────────────────────────────────────────────────────
+function openAddModal(){ document.getElementById('add-modal').classList.add('open') }
+function closeAddModal(){ document.getElementById('add-modal').classList.remove('open') }
+
+async function addRecord(){
+  const data = {
+    app_name:    document.getElementById('f-app').value.trim(),
+    record_name: document.getElementById('f-rec').value.trim(),
+    zone:        document.getElementById('f-zone').value.trim(),
+    ho_ip:       document.getElementById('f-hoip').value.trim(),
+    dr_ip:       document.getElementById('f-drip').value.trim(),
+    dns_server:  document.getElementById('f-dns').value.trim(),
+  };
+  if(!data.app_name||!data.record_name||!data.zone||!data.ho_ip||!data.dr_ip){
+    toast('Fill all required fields','err'); return;
+  }
+  await fetch('/api/records', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  closeAddModal();
+  ['f-app','f-rec','f-zone','f-hoip','f-drip','f-dns'].forEach(id => document.getElementById(id).value='');
+  await loadRecords();
+  toast('Record added','ok');
+}
+
+// ── import / export ────────────────────────────────────────────────────────
+async function importCSV(input){
+  const file = input.files[0];
+  if(!file){ return; }
+
+  // Ask append or replace
+  const replace = confirm(
+    `Import "${file.name}"\n\n` +
+    `Click OK to REPLACE all existing records with this file.\n` +
+    `Click Cancel to ADD to existing records.`
+  );
+
+  const fd = new FormData();
+  fd.append('file', file);
+
+  // Show loading toast
+  toast('Importing… please wait', 'ok');
+
+  try {
+    const r = await fetch('/api/records/import?replace=' + replace, {
+      method: 'POST', body: fd
+    });
+    const j = await r.json();
+
+    if(j.error){
+      // Hard error — show full message
+      alert('Import Failed:\n\n' + j.error);
+      toast('Import failed — ' + j.error, 'err');
+      input.value = '';
+      return;
+    }
+
+    await loadRecords();
+
+    // Show detailed result
+    let msg = `✓ ${j.added} records imported`;
+    if(j.replaced) msg += ' (replaced all previous)';
+    if(j.errors && j.errors.length){
+      msg += `\n\n⚠ ${j.errors.length} rows skipped:\n` + j.errors.slice(0,10).join('\n');
+      if(j.errors.length > 10) msg += `\n... and ${j.errors.length-10} more`;
+      alert(msg);
+      toast(`Imported ${j.added} records — ${j.errors.length} skipped`, 'err');
+    } else {
+      toast(`✓ ${j.added} records imported successfully`, 'ok');
+    }
+  } catch(e) {
+    alert('Import error: ' + e.message);
+    toast('Import error: ' + e.message, 'err');
+  }
+  input.value = '';
+}
+
+function exportCSV(){ window.location='/api/records/export' }
+
+// ── confirm + fire ─────────────────────────────────────────────────────────
+// ── pre-flight verify & fire ──────────────────────────────────────────────
+let verifyResults = [];
+
+function confirmFire(dir){
+  pendingDirection = dir;
+  openVerifyModal(dir);
+}
+
+function closeConfirm(){
+  document.getElementById('confirm-modal').classList.remove('open');
+  document.getElementById('verify-modal').classList.remove('open');
+}
+
+async function openVerifyModal(dir){
+  const ids = selectedIds.size ? [...selectedIds] : [];
+  const n   = ids.length || allRecords.length;
+
+  // Show verify modal in loading state
+  document.getElementById('verify-modal').classList.add('open');
+  document.getElementById('verify-title').textContent =
+    dir === 'DR' ? '⇒ PRE-FLIGHT CHECK — SWITCH TO DR' : '⇐ PRE-FLIGHT CHECK — ROLL BACK TO HO';
+  document.getElementById('verify-title').style.color =
+    dir === 'DR' ? 'var(--dr)' : 'var(--ho)';
+  document.getElementById('verify-summary').innerHTML =
+    `<span style="color:var(--text3)">Verifying ${n} records against DNS server 192.168.13.80…</span>`;
+  document.getElementById('verify-body').innerHTML =
+    `<div style="padding:30px;text-align:center;color:var(--text3)">
+      <div style="font-size:28px;margin-bottom:10px">⟳</div>
+      <div>Checking all records in parallel…</div>
+      <div style="font-size:11px;margin-top:6px">This takes ~10-20 seconds for 600 records</div>
+    </div>`;
+  document.getElementById('verify-go').style.display = 'none';
+  document.getElementById('verify-go').disabled = true;
+
+  try {
+    const r = await fetch('/api/records/verify', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({direction: dir, record_ids: ids})
+    });
+    const data = await r.json();
+    verifyResults = data.records || [];
+    renderVerifyResults(data.summary, dir);
+  } catch(e) {
+    document.getElementById('verify-body').innerHTML =
+      `<div style="padding:20px;color:var(--red)">⚠ Verify failed: ${e.message}</div>`;
+  }
+}
+
+function renderVerifyResults(summary, dir){
+  const col = dir==='DR' ? 'var(--dr)' : 'var(--ho)';
+
+  // Summary bar
+  document.getElementById('verify-summary').innerHTML = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px">
+      <span style="color:var(--green)">✓ Ready: <b>${summary.ready}</b></span>
+      ${summary.warning    ? `<span style="color:var(--yellow)">⚠ Warning: <b>${summary.warning}</b></span>` : ''}
+      ${summary.already_done ? `<span style="color:var(--text3)">↷ Already done: <b>${summary.already_done}</b></span>` : ''}
+      ${summary.not_found  ? `<span style="color:var(--red)">✗ Not found: <b>${summary.not_found}</b></span>` : ''}
+      ${summary.invalid    ? `<span style="color:var(--red)">✗ Invalid: <b>${summary.invalid}</b></span>` : ''}
+      ${summary.error      ? `<span style="color:var(--red)">✗ Error: <b>${summary.error}</b></span>` : ''}
+      <span style="margin-left:auto;color:${col};font-weight:700">Will change: ${summary.can_change}</span>
+    </div>`;
+
+  // Records table
+  const statusOrder = {ready:0, warning:1, already_done:2, not_found:3, invalid:4, error:5};
+  const sorted = [...verifyResults].sort((a,b) =>
+    (statusOrder[a.status]||9) - (statusOrder[b.status]||9));
+
+  const srcLabel = dir==='DR' ? 'HO IP (stored)' : 'DR IP (stored)';
+
+  document.getElementById('verify-body').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead>
+        <tr style="background:var(--bg0)">
+          <th style="padding:6px 10px;text-align:left;color:var(--text3)">App</th>
+          <th style="padding:6px 10px;text-align:left;color:var(--text3)">Record</th>
+          <th style="padding:6px 10px;text-align:left;color:var(--text3)">${srcLabel}</th>
+          <th style="padding:6px 10px;text-align:left;color:var(--text3)">Target IP</th>
+          <th style="padding:6px 10px;text-align:left;color:var(--text3)">Status</th>
+          <th style="padding:6px 10px;text-align:left;color:var(--text3)">Issue</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${sorted.map(r => {
+          const sc = {
+            ready:       ['var(--green)',  '✓ READY'],
+            warning:     ['var(--yellow)', '⚠ WARNING'],
+            already_done:['var(--text3)',  '↷ DONE'],
+            not_found:   ['var(--red)',    '✗ NOT FOUND'],
+            invalid:     ['var(--red)',    '✗ INVALID'],
+            error:       ['var(--red)',    '✗ ERROR'],
+          }[r.status] || ['var(--text3)', r.status];
+          const srcIp = dir==='DR' ? r.ho_ip : r.dr_ip;
+          return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:6px 10px;font-weight:600">${r.app_name||'—'}</td>
+            <td style="padding:6px 10px;color:var(--text2)">${r.record_name||''}.${r.zone||''}</td>
+            <td style="padding:6px 10px;font-family:var(--mono);color:${dir==='DR'?'var(--ho)':'var(--dr)'}">${srcIp||'—'}</td>
+            <td style="padding:6px 10px;font-family:var(--mono);color:${col}">${r.target_ip||'—'}</td>
+            <td style="padding:6px 10px"><span style="color:${sc[0]};font-weight:700;font-size:10px">${sc[1]}</span></td>
+            <td style="padding:6px 10px;color:var(--text3);max-width:220px;word-break:break-word">${(r.issues||[]).join('; ')||''}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+
+  // Show fire button only if there are records that can change
+  const goBtn = document.getElementById('verify-go');
+  if(summary.can_change > 0){
+    goBtn.style.display = 'block';
+    goBtn.disabled = false;
+    goBtn.textContent = dir === 'DR'
+      ? `CONFIRM — CHANGE ${summary.can_change} RECORDS ⇒ DR`
+      : `CONFIRM — CHANGE ${summary.can_change} RECORDS ⇐ HO`;
+    goBtn.style.background  = dir === 'DR' ? 'var(--dr-dim)' : 'var(--ho-dim)';
+    goBtn.style.borderColor = dir === 'DR' ? 'var(--dr)' : 'var(--ho)';
+    goBtn.style.color       = dir === 'DR' ? 'var(--dr)' : 'var(--ho)';
+    goBtn.onclick = () => fireJob(summary.can_change);
+
+    if(summary.not_found || summary.invalid || summary.error){
+      toast(`⚠ ${summary.not_found + summary.invalid + summary.error} records will be SKIPPED — check issues column`, 'err');
+    } else {
+      toast(`✓ ${summary.can_change} records ready to change`, 'ok');
+    }
+  } else {
+    goBtn.style.display = 'none';
+    toast('No records can be changed — check issues above', 'err');
+  }
+}
+
+async function fireJob(){
+  document.getElementById('verify-modal').classList.remove('open');
+  const dir = pendingDirection;
+  // Only send IDs of records that can actually change
+  const changeableIds = verifyResults
+    .filter(r => r.can_change)
+    .map(r => r.id);
+
+  const r = await fetch('/api/job/start',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({direction: dir, record_ids: changeableIds})
+  });
+  const j = await r.json();
+  if(j.error){ toast(j.error,'err'); return; }
+  switchTab('job');
+  jobStartTime = Date.now();
+  startPolling();
+}
+
+// ── job polling ────────────────────────────────────────────────────────────
+function startPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(checkJobStatus, 800);
+}
+
+async function checkJobStatus(){
+  const r = await fetch('/api/job/status');
+  const j = await r.json();
+  updateJobUI(j);
+  if(!j.running && pollTimer && j.started_at){
+    clearInterval(pollTimer); pollTimer=null;
+    jobRunning=false; updateFireBtns();
+    loadHistory();
+    setTimeout(() => toast(`Job complete — ${j.results.filter(x=>x.status==='success').length} OK, ${j.results.filter(x=>x.status==='failed').length} failed`, 'ok'), 200);
+  }
+}
+
+function updateJobUI(j){
+  jobRunning = j.running;
+  updateFireBtns();
+
+  const badge = document.getElementById('dir-badge');
+  if(j.started_at){
+    badge.className = `direction-badge ${j.direction==='DR'?'dir-dr':'dir-ho'}`;
+    badge.textContent = `${j.direction==='DR'?'⇒ DR':'⇐ HO'} ${j.running?'RUNNING':'DONE'}`;
+  } else {
+    badge.className='direction-badge dir-idle'; badge.textContent='IDLE';
+  }
+
+  document.getElementById('abort-btn').style.display = j.running?'block':'none';
+  document.getElementById('job-server-lbl').textContent = j.started_at ? `DNS: 192.168.13.80` : '';
+  document.getElementById('job-time-lbl').textContent = j.started_at ? `Started: ${new Date(j.started_at).toLocaleTimeString()}${j.finished_at?' · Finished: '+new Date(j.finished_at).toLocaleTimeString():''}` : '';
+
+  const total = j.total||0, done=j.done||0;
+  const ok   = (j.results||[]).filter(x=>x.status==='success').length;
+  const fail = (j.results||[]).filter(x=>x.status==='failed').length;
+
+  document.getElementById('m-total').textContent = total||'—';
+  document.getElementById('m-done').textContent  = done||'—';
+  document.getElementById('m-ok').textContent    = ok||'—';
+  document.getElementById('m-fail').textContent  = fail||'—';
+
+  const pct = total ? Math.round(done/total*100) : 0;
+  const fill = document.getElementById('prog-fill');
+  fill.style.width = pct+'%';
+  if(!j.running && done===total && total>0) fill.className='progress-fill '+(fail?'done-fail':'done-ok');
+  else fill.className='progress-fill';
+  document.getElementById('prog-pct').textContent = pct+'%';
+
+  // ETA + speed
+  if(j.running && done > 0 && jobStartTime){
+    const elapsed = (Date.now()-jobStartTime)/1000;
+    const rate = done/elapsed;
+    const remaining = (total-done)/rate;
+    const rps = rate.toFixed(1);
+    document.getElementById('prog-eta').textContent =
+      `${rps} rec/s · ~${Math.ceil(remaining)}s remaining`;
+  } else if(!j.running && done > 0 && jobStartTime) {
+    const elapsed = ((Date.now()-jobStartTime)/1000).toFixed(1);
+    const rps = (done/elapsed).toFixed(1);
+    document.getElementById('prog-eta').textContent =
+      `Done in ${elapsed}s · avg ${rps} rec/s`;
+  } else {
+    document.getElementById('prog-eta').textContent='';
+  }
+
+  // results table
+  const results = j.results||[];
+  if(results.length){
+    document.querySelector('.empty-state') && (document.querySelector('.empty-state').style.display='none');
+    const tbl = document.getElementById('results-table');
+    tbl.style.display='table';
+    const tbody = document.getElementById('results-body');
+    tbody.innerHTML = results.map(r=>`
+      <tr>
+        <td><b>${r.app_name}</b></td>
+        <td style="color:var(--text2)">${r.record_name}.${r.zone||''}</td>
+        <td class="ip-cell ip-ho">${r.from_ip}</td>
+        <td class="arrow-cell">→</td>
+        <td class="ip-cell ${r.to_ip===r.from_ip?'':'ip-dr'}">${r.to_ip}</td>
+        <td class="${r.status==='success'?'status-ok':'status-fail'}">${r.status==='success'?'OK':'FAIL'}</td>
+        <td style="color:var(--text3);font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.message}">${r.message}</td>
+      </tr>`).join('');
+  }
+}
+
+async function abortJob(){
+  await fetch('/api/job/abort',{method:'POST'});
+  toast('Abort signal sent','err');
+}
+
+// ── history ────────────────────────────────────────────────────────────────
+async function loadHistory(){
+  const r = await fetch('/api/history');
+  const sessions = await r.json();
+  const el = document.getElementById('history-list');
+  if(!sessions.length){
+    el.innerHTML = `<div class="empty-state"><big>No history</big>Sessions appear here after a job completes</div>`;
+    return;
+  }
+  el.innerHTML = sessions.map((s,i)=>`
+    <div class="hist-item">
+      <div class="hist-head" onclick="toggleHist(${i})">
+        <span class="hist-dir ${s.direction.toLowerCase()}">${s.direction==='DR'?'⇒ DR':'⇐ HO'}</span>
+        <div>
+          <div class="hist-time">${new Date(s.session).toLocaleString()}</div>
+          <div class="hist-server">${s.dns_server}</div>
+        </div>
+        <div class="hist-stats" style="margin-left:auto">
+          <span class="hist-ok">✓ ${s.success}</span> &nbsp;
+          <span class="hist-fail">${s.failed?'✗ '+s.failed:''}</span>
+          &nbsp; / ${s.total} total
+        </div>
+      </div>
+      <div class="hist-body" id="hist-body-${i}">
+        <table style="width:100%">
+          <thead><tr><th>App</th><th>Record</th><th>From</th><th></th><th>To</th><th>Status</th></tr></thead>
+          <tbody>
+            ${(s.records||[]).map(r=>`<tr>
+              <td>${r.app_name}</td>
+              <td style="color:var(--text2)">${r.record_name}</td>
+              <td class="ip-ho ip-cell">${r.from_ip}</td>
+              <td class="arrow-cell">→</td>
+              <td class="ip-dr ip-cell">${r.to_ip}</td>
+              <td class="${r.status==='success'?'status-ok':'status-fail'}">${r.status==='success'?'OK':'FAIL'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`).join('');
+}
+
+function toggleHist(i){
+  const el = document.getElementById(`hist-body-${i}`);
+  el.classList.toggle('open');
+}
+
+// ── tabs ───────────────────────────────────────────────────────────────────
+function switchTab(name){
+  const names = ['job','history','live'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active', names[i]===name));
+  document.querySelectorAll('.tab-content').forEach((c,i)=>c.classList.toggle('active', ['tab-job','tab-history','tab-live'][i]===`tab-${name}`));
+  if(name==='history') loadHistory();
+  if(name==='live' && liveData.length===0) { /* just show empty state */ }
+}
+
+// ── live dns browser ───────────────────────────────────────────────────────
+let currentZoneRecords = [];
+let currentZone = '';
+
+async function loadZones(){
+  const btn = document.getElementById('zones-refresh-btn');
+  const list = document.getElementById('zone-list');
+  btn.disabled = true;
+  btn.textContent = '…';
+  list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:11px">Loading zones...</div>';
+
+  try {
+    const r = await fetch('/api/dns/zones');
+    const zones = await r.json();
+    if(zones.error){
+      list.innerHTML = `<div style="padding:12px;color:var(--red);font-size:11px">⚠ ${zones.error}</div>`;
+      toast('Failed to load zones: ' + zones.error, 'err');
+      return;
+    }
+    if(!zones.length){
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:11px">No zones found</div>';
+      return;
+    }
+    list.innerHTML = zones.map(z => `
+      <div onclick="loadZoneRecords('${z.name}')"
+           style="padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;display:flex;align-items:center;gap:8px"
+           id="zone-item-${z.name.replace(/\./g,'-')}"
+           onmouseover="this.style.background='var(--bg3)'"
+           onmouseout="this.style.background=currentZone==='${z.name}'?'var(--bg3)':''">
+        <span style="font-size:14px">📁</span>
+        <div>
+          <div style="font-size:12px;color:var(--text)">${z.name}</div>
+          <div style="font-size:10px;color:var(--text3)">${z.type}</div>
+        </div>
+      </div>`).join('');
+    toast(`Loaded ${zones.length} zones`, 'ok');
+  } catch(e) {
+    list.innerHTML = `<div style="padding:12px;color:var(--red);font-size:11px">⚠ ${e.message}</div>`;
+    toast('Error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⟳';
+  }
+}
+
+async function loadZoneRecords(zone){
+  currentZone = zone;
+  currentZoneRecords = [];
+
+  // highlight selected zone
+  document.querySelectorAll('[id^="zone-item-"]').forEach(el => el.style.background = '');
+  const zid = document.getElementById('zone-item-' + zone.replace(/\./g,'-'));
+  if(zid) zid.style.background = 'var(--bg3)';
+
+  document.getElementById('zone-title').textContent = zone;
+  document.getElementById('zone-subtitle').textContent = 'Loading A records...';
+  document.getElementById('rec-count').textContent = '';
+  document.getElementById('dns-records-wrap').innerHTML =
+    '<div style="padding:40px;text-align:center;color:var(--text3);font-size:12px">⟳ Querying DNS server for ' + zone + '...</div>';
+
+  try {
+    const r = await fetch('/api/dns/records?zone=' + encodeURIComponent(zone));
+    const data = await r.json();
+    if(data.error){
+      document.getElementById('dns-records-wrap').innerHTML =
+        `<div style="padding:20px;color:var(--red);font-size:12px">⚠ ${data.error}</div>`;
+      return;
+    }
+    currentZoneRecords = data.records || [];
+    document.getElementById('zone-subtitle').textContent = `${currentZoneRecords.length} A records in this zone`;
+    document.getElementById('rec-count').textContent = currentZoneRecords.length + ' records';
+    renderDnsRecords();
+    toast(`Loaded ${currentZoneRecords.length} records from ${zone}`, 'ok');
+  } catch(e) {
+    document.getElementById('dns-records-wrap').innerHTML =
+      `<div style="padding:20px;color:var(--red);font-size:12px">⚠ ${e.message}</div>`;
+  }
+}
+
+function filterDnsRecords(){
+  renderDnsRecords();
+}
+
+function renderDnsRecords(){
+  const q = (document.getElementById('dns-rec-search')||{value:''}).value.toLowerCase();
+  const filtered = q
+    ? currentZoneRecords.filter(r =>
+        (r.hostname||'').toLowerCase().includes(q) ||
+        (r.ip||'').includes(q))
+    : currentZoneRecords;
+
+  document.getElementById('rec-count').textContent =
+    q ? `${filtered.length} / ${currentZoneRecords.length} records` : `${currentZoneRecords.length} records`;
+
+  const wrap = document.getElementById('dns-records-wrap');
+  if(!filtered.length){
+    wrap.innerHTML = '<div class="empty-state"><big>0</big>No records match</div>';
+    return;
+  }
+
+  wrap.innerHTML = `
+  <div style="padding:6px 14px;font-size:10px;color:var(--text3);background:var(--bg1);border-bottom:1px solid var(--border)">
+    💡 Click any record to add it to your dashboard with HO/DR IPs
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Hostname</th>
+        <th>Current IP</th>
+        <th>TTL</th>
+        <th>Full Name</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filtered.map(r => `<tr style="cursor:pointer" onclick="prefillFromDNS('${r.hostname}','${r.ip}','${currentZone}')"
+          onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+        <td style="color:var(--text);font-weight:600">${r.hostname}</td>
+        <td style="color:var(--ho);font-family:var(--mono);font-weight:700">${r.ip}</td>
+        <td style="color:var(--text3);font-size:11px">${r.ttl}</td>
+        <td style="color:var(--text3);font-size:11px">${r.hostname}.${currentZone}</td>
+        <td><span style="font-size:10px;padding:2px 8px;background:var(--bg3);border:1px solid var(--border2);color:var(--ho);cursor:pointer">+ Add</span></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function prefillFromDNS(hostname, currentIp, zone){
+  // Open the Add Record modal pre-filled with DNS data
+  // Current IP goes into HO IP — user fills in DR IP
+  document.getElementById('f-app').value   = hostname;
+  document.getElementById('f-rec').value   = hostname;
+  document.getElementById('f-zone').value  = zone;
+  document.getElementById('f-hoip').value  = currentIp;
+  document.getElementById('f-drip').value  = '';
+  document.getElementById('f-dns').value   = '';
+
+  // highlight the DR IP field — user must fill this in
+  document.getElementById('add-modal').classList.add('open');
+
+  // show a hint inside the modal
+  setTimeout(()=>{
+    const drField = document.getElementById('f-drip');
+    drField.focus();
+    drField.style.borderColor = 'var(--dr)';
+    drField.placeholder = '← Enter DR site IP here';
+    // reset border after typing
+    drField.addEventListener('input', ()=>{ drField.style.borderColor=''; }, {once:true});
+  }, 100);
+
+  toast('Pre-filled from DNS — enter the DR IP to complete', 'ok');
+}
+
+
+// ── toast ──────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, type='ok'){
+  const el = document.createElement('div');
+  el.className=`toast ${type}`;
+  el.textContent=msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),3500);
+}
+
+// ── speed control ──────────────────────────────────────────────────────────
+async function updateWorkers(val){
+  document.getElementById('worker-val').textContent = val;
+  // estimate: each record ~6s on server, parallelism divides total time
+  const secs = Math.ceil(600 * 6 / val);
+  const mins = Math.floor(secs/60), rem = secs%60;
+  document.getElementById('speed-est').textContent =
+    `~600 records in ~${mins>0?mins+'m ':''}${rem}s at ${val} workers`;
+  try {
+    await fetch('/api/job/speed', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({workers: parseInt(val)})
+    });
+  } catch(e){}
+}
+
+// ── connection test ────────────────────────────────────────────────────────
+async function testConnection(){
+  const btn = document.getElementById('test-conn-btn');
+  const dot = document.getElementById('conn-dot');
+  const rows = document.getElementById('conn-status-rows');
+  btn.disabled = true;
+  btn.textContent = '⟳ Testing…';
+  dot.style.background = 'var(--yellow)';
+  rows.style.display = 'block';
+
+  // reset
+  ['cs-ping','cs-port','cs-auth','cs-dns'].forEach(id =>
+    document.getElementById(id).innerHTML = '<span style="color:var(--text3)">…</span>');
+  document.getElementById('cs-zones-row').style.display = 'none';
+  document.getElementById('cs-error-row').style.display = 'none';
+
+  try {
+    const r = await fetch('/api/test-connection');
+    const j = await r.json();
+
+    const tick = ok => ok
+      ? '<span style="color:var(--green)">✓ OK</span>'
+      : '<span style="color:var(--red)">✗ FAIL</span>';
+
+    document.getElementById('cs-ping').innerHTML = tick(j.ping);
+    document.getElementById('cs-port').innerHTML = tick(j.winrm_port);
+    document.getElementById('cs-auth').innerHTML = tick(j.winrm_auth);
+    document.getElementById('cs-dns').innerHTML  = tick(j.dns_module);
+
+    if(j.zones && j.zones.length){
+      const zr = document.getElementById('cs-zones-row');
+      zr.innerHTML = '📋 Zones: ' + j.zones.join(', ');
+      zr.style.display = 'block';
+    }
+
+    // Show error hints
+    const errs = [];
+    if(!j.ping)       errs.push('Cannot ping 192.168.13.80 — check network/firewall');
+    if(j.ping && !j.winrm_port) errs.push('Port 5985 (WinRM) is closed — run on DNS server: Enable-PSRemoting -Force');
+    if(j.winrm_port && !j.winrm_auth){
+      errs.push('WinRM auth failed: ' + (j.winrm_detail||'check username/password in app.py'));
+    }
+    if(j.winrm_auth && !j.dns_module){
+      errs.push('DNS module error: ' + (j.dns_detail||'RSAT DNS tools may not be installed on the server'));
+    }
+
+    if(errs.length){
+      const er = document.getElementById('cs-error-row');
+      er.innerHTML = errs.map(e=>`⚠ ${e}`).join('<br>');
+      er.style.display = 'block';
+    }
+
+    dot.style.background = j.overall ? 'var(--green)' : 'var(--red)';
+    toast(j.overall ? 'Connected to DNS server ✓' : 'Connection failed — see details', j.overall?'ok':'err');
+  } catch(e) {
+    dot.style.background = 'var(--red)';
+    document.getElementById('cs-error-row').innerHTML = '⚠ ' + e.message;
+    document.getElementById('cs-error-row').style.display = 'block';
+    toast('Test failed: ' + e.message, 'err');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '⟳ Test Connection';
+}
+
+init();
+</script>
+</body>
+</html>
